@@ -1,0 +1,605 @@
+import random
+import os
+import json
+
+class Player:
+    def __init__(self, name, player_class):
+        self.name = name
+        self.player_class = player_class
+        self.health = 100
+        self.attack = 10
+        self.defense = 5
+        self.gold = 0
+        self.experience = 0
+        self.level = 1
+
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health < 0:
+            self.health = 0
+
+    def heal(self, amount):
+        self.health += amount
+
+    def earn_gold(self, amount):
+        self.gold += amount
+
+    def attack_enemy(self, enemy):
+        damage_dealt = max(0, self.attack - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+    def gain_experience(self, amount):
+        self.experience += amount
+        print(f"You gained {amount} experience points!")
+
+        # Check if player leveled up
+        if self.experience >= self.level * 10:
+            self.level_up()
+
+    def level_up(self):
+        self.level += 1
+        self.experience = 0
+
+        # Increase stats upon leveling up
+        self.attack += random.randint(1, 3)
+        self.defense += random.randint(1, 2)
+        self.health = 100  # Reset health upon leveling up
+
+        print(f"Congratulations! You reached Level {self.level}!")
+        print(f"Your stats have increased. Health: {self.health} | Attack: {self.attack} | Defense: {self.defense}")
+
+    def is_alive(self):
+        return self.health > 0
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'player_class': self.player_class,
+            'health': self.health,
+            'attack': self.attack,
+            'defense': self.defense,
+            'gold': self.gold,
+            'experience': self.experience,
+            'level': self.level
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        player = cls(data['name'], data['player_class'])
+        player.health = data['health']
+        player.attack = data['attack']
+        player.defense = data['defense']
+        player.gold = data['gold']
+        player.experience = data['experience']
+        player.level = data['level']
+        return player
+
+class NPC:
+    def __init__(self, name, description):
+        self.name = name
+        self.description = description
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'description': self.description
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data['name'], data['description'])
+
+class Monster:
+    def __init__(self, name, health, attack, defense, gold_reward, experience_reward):
+        self.name = name
+        self.health = health
+        self.attack = attack
+        self.defense = defense
+        self.gold_reward = gold_reward
+        self.experience_reward = experience_reward
+
+    def attack_player(self, player):
+        damage_taken = max(0, self.attack - player.defense)
+        player.take_damage(damage_taken)
+        return damage_taken
+
+    def is_alive(self):
+        return self.health > 0
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'health': self.health,
+            'attack': self.attack,
+            'defense': self.defense,
+            'gold_reward': self.gold_reward,
+            'experience_reward': self.experience_reward
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data['name'], data['health'], data['attack'], data['defense'], data['gold_reward'], data['experience_reward'])
+
+# Define player classes with unique abilities
+class Knight(Player):
+    def __init__(self, name):
+        super().__init__(name, "Knight")
+        self.defense += 5
+
+    def special_ability(self, enemy):
+        print("You activate your special ability: Shield Bash!")
+        damage_dealt = max(0, self.attack + 5 - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+class Mage(Player):
+    def __init__(self, name):
+        super().__init__(name, "Mage")
+        self.attack += 5
+
+    def special_ability(self, enemy):
+        print("You cast a powerful spell: Fireball!")
+        damage_dealt = max(0, self.attack - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+class Assassin(Player):
+    def __init__(self, name):
+        super().__init__(name, "Assassin")
+        self.attack += 3
+
+    def special_ability(self, enemy):
+        print("You execute a deadly sneak attack!")
+        damage_dealt = max(0, self.attack + 3 - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+class Shield(Player):
+    def __init__(self, name):
+        super().__init__(name, "Shield")
+        self.defense += 8
+
+    def special_ability(self, enemy):
+        print("You activate your special ability: Iron Defense!")
+        self.defense += 5
+        return 0  # Special ability only affects player's defense
+
+class Priest(Player):
+    def __init__(self, name):
+        super().__init__(name, "Priest")
+        self.health += 10
+
+    def special_ability(self, enemy):
+        print("You use your healing powers: Divine Heal!")
+        heal_amount = random.randint(10, 20)
+        self.heal(heal_amount)
+        return 0  # Special ability only affects player's health
+
+class Demon(Player):
+    def __init__(self, name):
+        super().__init__(name, "Demon")
+        self.attack += 3
+
+    def special_ability(self, enemy):
+        print("You unleash your demonic powers: Hellfire!")
+        damage_dealt = max(0, self.attack + 3 - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+class Hero(Player):
+    def __init__(self, name):
+        super().__init__(name, "Hero")
+        self.attack += 2
+        self.defense += 2
+
+    def special_ability(self, enemy):
+        print("You embody the spirit of a true hero: Heroic Strike!")
+        damage_dealt = max(0, self.attack + 2 - enemy.defense)
+        enemy.health -= damage_dealt
+        return damage_dealt
+
+def choose_class():
+    print("\nChoose your class:")
+    print("1. Knight (High defense, Shield Bash)")
+    print("2. Mage (High attack, Fireball)")
+    print("3. Assassin (Balanced stats, Sneak Attack)")
+    print("4. Shield (Very high defense, Iron Defense)")
+    print("5. Priest (High health, Divine Heal)")
+    print("6. Demon (High attack, Hellfire)")
+    print("7. Hero (Balanced stats, Heroic Strike)")
+
+    class_choice = input("Enter the number corresponding to your chosen class: ")
+
+    if class_choice == "1":
+        return Knight
+    elif class_choice == "2":
+        return Mage
+    elif class_choice == "3":
+        return Assassin
+    elif class_choice == "4":
+        return Shield
+    elif class_choice == "5":
+        return Priest
+    elif class_choice == "6":
+        return Demon
+    elif class_choice == "7":
+        return Hero
+    else:
+        print("Invalid choice. Defaulting to Knight.")
+        return Knight
+
+def explore(player):
+    print("You embark on an adventure!")
+
+    while True:
+        print("\n1. Explore further")
+        print("2. Visit the town")
+        print("3. Check your status")
+        print("4. Save progress")
+        print("5. Quit")
+
+        choice = input("Enter your choice (1/2/3/4/5): ")
+
+        if choice == "1":
+            encounter_chance = random.randint(1, 10)
+            if encounter_chance <= 5:
+                monster = Monster("Goblin", random.randint(20, 30), random.randint(5, 10), random.randint(2, 5), random.randint(5, 10), random.randint(5, 10))
+                print(f"You encounter a {monster.name}!")
+
+                while player.is_alive() and monster.is_alive():
+                    print("\nPlayer Stats:")
+                    print(f"Health: {player.health} | Attack: {player.attack} | Defense: {player.defense} | Gold: {player.gold} | Level: {player.level}")
+                    print(f"{monster.name} Stats:")
+                    print(f"Health: {monster.health} | Attack: {monster.attack} | Defense: {monster.defense}")
+
+                    action = input("\nDo you want to attack? (yes/no): ").lower()
+
+                    if action == "yes":
+                        damage_dealt = player.attack_enemy(monster)
+                        print(f"You dealt {damage_dealt} damage to the {monster.name}!")
+
+                        if not monster.is_alive():
+                            print(f"You defeated the {monster.name}!")
+                            player.earn_gold(monster.gold_reward)
+                            player.gain_experience(monster.experience_reward)
+                            print(f"You earned {monster.gold_reward} gold and gained {monster.experience_reward} experience!")
+
+                        else:
+                            damage_taken = monster.attack_player(player)
+                            print(f"The {monster.name} counterattacks and deals {damage_taken} damage to you!")
+
+                    elif action == "no":
+                        print("You decide not to attack. The monster attacks you!")
+                        damage_taken = monster.attack_player(player)
+                        print(f"The {monster.name} dealt {damage_taken} damage to you!")
+
+                    if not player.is_alive():
+                        print("Game over. You were defeated.")
+                        return
+
+            else:
+                print("You continue exploring and find nothing of interest.")
+
+        elif choice == "2":
+            visit_town(player)
+
+        elif choice == "3":
+            print("\nPlayer Stats:")
+            print(f"Health: {player.health} | Attack: {player.attack} | Defense: {player.defense} | Gold: {player.gold} | Level: {player.level}")
+
+        elif choice == "4":
+            save_progress(player)
+            print("Progress saved.")
+
+        elif choice == "5":
+            print("Thanks for playing! Goodbye.")
+            break
+
+        else:
+            print("Invalid choice. Please enter a valid option.")
+
+def visit_town(player):
+    print("Welcome to the town!")
+    print("1. Visit the healer")
+    print("2. Visit the blacksmith")
+    print("3. Meet a friendly NPC")
+    print("4. Leave the town")
+
+    town_choice = input("Enter your choice (1/2/3/4): ")
+
+    if town_choice == "1":
+        heal_amount = random.randint(10, 20)
+        player.heal(heal_amount)
+        print(f"The healer healed you for {heal_amount} health.")
+    elif town_choice == "2":
+        upgrade_cost = 20
+        if player.gold >= upgrade_cost:
+            player.attack += random.randint(1, 5)
+            player.defense += random.randint(1, 3)
+            player.gold -= upgrade_cost
+            print("You upgraded your equipment!")
+        else:
+            print("You don't have enough gold to upgrade.")
+    elif town_choice == "3":
+        friendly_npc = NPC("Samuel the Wise", "An old man with a long white beard.")
+        print(f"You meet {friendly_npc.name}. {friendly_npc.description}")
+    elif town_choice == "4":
+        print("Leaving the town...")
+    else:
+        print("Invalid choice. Please enter a valid option.")
+
+def save_progress(player):
+    save_data = {
+        'player': player.to_dict(),
+        # Add other game state data to save_data if needed
+    }
+
+    with open("savegame.json", "w") as file:
+        json.dump(save_data, file)
+
+def load_progress():
+    if os.path.exists("savegame.json"):
+        with open("savegame.json", "r") as file:
+            save_data = json.load(file)
+            player_class = globals()[save_data['player']['player_class']]
+            player = player_class.from_dict(save_data['player'])
+            # Add code to load other game state data if needed
+            return player
+    else:
+        return None
+
+# Entry point
+def main():
+    print("Welcome to the Text Adventure Game!")
+    print("1. Start a new game")
+    print("2. Load saved game")
+
+    start_choice = input("Enter your choice (1/2): ")
+
+    if start_choice == "1":
+        player_name = input("Enter your name: ")
+        player_class = choose_class()
+        player = player_class(player_name)
+    elif start_choice == "2":
+        player = load_progress()
+        if player is None:
+            print("No saved game found. Starting a new game.")
+            player_name = input("Enter your name: ")
+            player_class = choose_class()
+            player = player_class(player_name)
+
+    explore(player)
+
+if __name__ == "__main__":
+    main()
+
+# ... (Previous code)
+
+class DemonKing(Demon):
+    def __init__(self, name):
+        super().__init__(name)
+        self.attack += 5
+        self.defense += 3
+
+    def special_ability(self, enemy):
+        print("As the Demon King, monsters bow to your command!")
+        return 0  # Demon King's special ability has no direct combat effect
+
+def unlock_demon_king(player):
+    if player.level >= 10 and isinstance(player, Demon):
+        print("Congratulations! Your Demon has reached level 10.")
+        print("You have unlocked the hidden class: Demon King!")
+        print("Monsters will now obey your command.")
+        return DemonKing
+    else:
+        return None
+
+# ... (Rest of the code remains the same)
+
+def explore(player):
+    print("You embark on an adventure!")
+
+    while True:
+        print("\n1. Explore further")
+        print("2. Visit the town")
+        print("3. Check your status")
+        print("4. Save progress")
+        print("5. Quit")
+
+        choice = input("Enter your choice (1/2/3/4/5): ")
+
+        if choice == "1":
+            encounter_chance = random.randint(1, 10)
+            if encounter_chance <= 5:
+                monster = Monster("Goblin", random.randint(20, 30), random.randint(5, 10), random.randint(2, 5), random.randint(5, 10), random.randint(5, 10))
+                print(f"You encounter a {monster.name}!")
+
+                while player.is_alive() and monster.is_alive():
+                    print("\nPlayer Stats:")
+                    print(f"Health: {player.health} | Attack: {player.attack} | Defense: {player.defense} | Gold: {player.gold} | Level: {player.level}")
+                    print(f"{monster.name} Stats:")
+                    print(f"Health: {monster.health} | Attack: {monster.attack} | Defense: {monster.defense}")
+
+                    action = input("\nDo you want to attack? (yes/no): ").lower()
+
+                    if action == "yes":
+                        damage_dealt = player.attack_enemy(monster)
+                        print(f"You dealt {damage_dealt} damage to the {monster.name}!")
+
+                        if not monster.is_alive():
+                            print(f"You defeated the {monster.name}!")
+                            player.earn_gold(monster.gold_reward)
+                            player.gain_experience(monster.experience_reward)
+                            print(f"You earned {monster.gold_reward} gold and gained {monster.experience_reward} experience!")
+
+                            # Check if player can unlock Demon King class
+                            demon_king_class = unlock_demon_king(player)
+                            if demon_king_class:
+                                print("You feel a dark power within you. An ancient title is within your grasp.")
+                                choice = input("Do you want to become the Demon King? (yes/no): ").lower()
+                                if choice == "yes":
+                                    player.__class__ = demon_king_class
+                                    print("You are now the Demon King! Monsters obey your command.")
+                                    print("Your appearance changes, and your power surges.")
+                                    # Reset stats to avoid double bonuses
+                                    player.attack = 0
+                                    player.defense = 0
+                                    player.special_ability(monster)  # Activate Demon King's special ability
+
+                        else:
+                            damage_taken = monster.attack_player(player)
+                            print(f"The {monster.name} counterattacks and deals {damage_taken} damage to you!")
+
+                    elif action == "no":
+                        print("You decide not to attack. The monster attacks you!")
+                        damage_taken = monster.attack_player(player)
+                        print(f"The {monster.name} dealt {damage_taken} damage to you!")
+
+                    if not player.is_alive():
+                        print("Game over. You were defeated.")
+                        return
+
+            else:
+                print("You continue exploring and find nothing of interest.")
+
+        elif choice == "2":
+            visit_town(player)
+
+        elif choice == "3":
+            print("\nPlayer Stats:")
+            print(f"Health: {player.health} | Attack: {player.attack} | Defense: {player.defense} | Gold: {player.gold} | Level: {player.level}")
+
+        elif choice == "4":
+            save_progress(player)
+            print("Progress saved.")
+
+        elif choice == "5":
+            print("Thanks for playing! Goodbye.")
+            break
+
+        else:
+            print("Invalid choice. Please enter a valid option.")
+
+# ... (Rest of the code remains the same)
+
+if __name__ == "__main__":
+    main()
+
+import random
+import os
+import json
+
+# ... (Previous code)
+
+class Monster:
+    def __init__(self, name, base_health, base_attack, base_defense, gold_reward, experience_reward):
+        self.name = name
+        self.base_health = base_health
+        self.base_attack = base_attack
+        self.base_defense = base_defense
+        self.gold_reward = gold_reward
+        self.experience_reward = experience_reward
+        self.level = 1
+
+    def scale_stats(self, player_level):
+        # Scale monster stats based on player's level
+        scaling_factor = player_level / self.level
+        self.health = int(self.base_health * scaling_factor)
+        self.attack = int(self.base_attack * scaling_factor)
+        self.defense = int(self.base_defense * scaling_factor)
+
+    def attack_player(self, player):
+        damage_taken = max(0, self.attack - player.defense)
+        player.take_damage(damage_taken)
+        return damage_taken
+
+    def is_alive(self):
+        return self.health > 0
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'base_health': self.base_health,
+            'base_attack': self.base_attack,
+            'base_defense': self.base_defense,
+            'gold_reward': self.gold_reward,
+            'experience_reward': self.experience_reward,
+            'level': self.level
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        monster = cls(data['name'], data['base_health'], data['base_attack'], data['base_defense'], data['gold_reward'], data['experience_reward'])
+        monster.level = data['level']
+        return monster
+
+# ... (Rest of the code)
+
+def explore(player):
+    print("You embark on an adventure!")
+
+    while True:
+        print("\n1. Explore further")
+        print("2. Visit the town")
+        print("3. Check your status")
+        print("4. Save progress")
+        print("5. Quit")
+
+        choice = input("Enter your choice (1/2/3/4/5): ")
+
+        if choice == "1":
+            encounter_chance = random.randint(1, 10)
+            if encounter_chance <= 5:
+                monster = Monster("Goblin", random.randint(20, 30), random.randint(5, 10), random.randint(2, 5), random.randint(5, 10), random.randint(5, 10))
+                monster.level = player.level  # Set monster level equal to player's level
+                monster.scale_stats(player.level)  # Scale monster stats based on player's level
+                print(f"You encounter a level {monster.level} {monster.name}!")
+
+                while player.is_alive() and monster.is_alive():
+                    # ... (Rest of the combat code remains the same)
+
+                    if not monster.is_alive():
+                        print(f"You defeated the {monster.name}!")
+                        player.earn_gold(monster.gold_reward)
+                        player.gain_experience(monster.experience_reward)
+                        print(f"You earned {monster.gold_reward} gold and gained {monster.experience_reward} experience!")
+
+                        # Check if player can unlock Demon King class
+                        demon_king_class = unlock_demon_king(player)
+                        if demon_king_class:
+                            print("You feel a dark power within you. An ancient title is within your grasp.")
+                            choice = input("Do you want to become the Demon King? (yes/no): ").lower()
+                            if choice == "yes":
+                                player.__class__ = demon_king_class
+                                print("You are now the Demon King! Monsters obey your command.")
+                                print("Your appearance changes, and your power surges.")
+                                # Reset stats to avoid double bonuses
+                                player.attack = 0
+                                player.defense = 0
+                                player.special_ability(monster)  # Activate Demon King's special ability
+
+                    # ... (Rest of the combat code remains the same)
+
+        elif choice == "2":
+            visit_town(player)
+
+        elif choice == "3":
+            print("\nPlayer Stats:")
+            print(f"Health: {player.health} | Attack: {player.attack} | Defense: {player.defense} | Gold: {player.gold} | Level: {player.level}")
+
+        elif choice == "4":
+            save_progress(player)
+            print("Progress saved.")
+
+        elif choice == "5":
+            print("Thanks for playing! Goodbye.")
+            break
+
+        else:
+            print("Invalid choice. Please enter a valid option.")
+
+# ... (Rest of the code remains the same)
+
+if __name__ == "__main__":
+    main()
